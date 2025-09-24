@@ -78,14 +78,13 @@ def add_header(left_logo: str, right_logo: str,
     )
 
 # --- Gọi hàm header ---
-add_header(
-    left_logo=r"D:\DSGE\PNG1.png",   # logo Khoa Toán Kinh tế
-    right_logo=r"D:\DSGE\PNG2.png",  # logo Đại học Kinh tế Quốc dân
-    title="Real Business Cycle Model Simulation (Full RBC)",
-    subtitle_top="Đại học Kinh tế Quốc dân",
-    subtitle_bottom="Khoa Toán Kinh tế"
-)
 
+add_header(
+    left_logo="PNG1.png",
+    title="Real Business Cycle Model Simulation (Full RBC)",
+    subtitle_top="National Economics University",
+    
+)
 
 # ========== Sidebar: parameters ==========
 st.sidebar.header("Model Parameters")
@@ -283,8 +282,40 @@ def plot_grid(series, T, title):
 
 # ========== Top: Model Overview (rich) ==========
 with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
-    st.markdown(
-        r"""
+    st.markdown("### Households")
+    st.markdown("The representative household maximizes lifetime utility:")
+    st.latex(r"""
+    \max_{\{c_t,k_{t+1},n_t\}} \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t u(c_t,n_t),\quad
+    u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta}-\theta\frac{n_t^{1+\phi}}{1+\phi}
+    """)
+
+    st.markdown("**Budget and capital accumulation:**")
+    st.latex(r"c_t+i_t=r_tk_t+w_t n_t,\qquad k_{t+1}=(1-\delta)k_t+i_t")
+
+    st.markdown("### Production")
+    st.latex(r"y_t=A_t k_t^{\alpha} n_t^{1-\alpha}")
+
+    st.markdown("### Stochastic process")
+    st.latex(r"\log A_t=(1-\rho_A)\log(A^{ss})+\rho_A\log(A_{t-1})+\varepsilon_t,\quad \varepsilon_t\sim\mathcal N(0,\sigma_e^2)")
+
+    st.markdown("### Equilibrium condition")
+    st.latex(r"y_t=c_t+i_t")
+
+    st.markdown("### Non-linear Equations")
+    st.latex(r"\theta c_t^{\eta}n_t^{\phi}=w_t")
+    st.latex(r"c_t^{-\eta}=\beta\,\mathbb{E}_t\!\left[c_{t+1}^{-\eta}(1+r_{t+1}-\delta)\right]")
+    st.latex(r"k_{t+1}=(1-\delta)k_t+i_t")
+    st.latex(r"y_t=A_t k_t^{\alpha} n_t^{1-\alpha}")
+    st.latex(r"r_t=A_t \alpha k_t^{\alpha-1} n_t^{1-\alpha}")
+    st.latex(r"w_t=A_t(1-\alpha)k_t^{\alpha}n_t^{-\alpha}")
+
+    st.markdown("### Log-linearized (Uhlig rules; tildes = log-deviation)")
+    st.latex(r"\eta \tilde c_t + \phi \tilde n_t = \tilde w_t")
+    st.latex(r"\mathbb{E}_t(\tilde c_{t+1})-\tilde c_t = \beta r^{ss}\eta\,\mathbb{E}_t(\tilde r_{t+1})")
+    st.latex(r"\tilde k_{t+1}=(1-\delta)\tilde k_t+\delta \tilde i_t")
+    st.latex(r"\tilde y_t=\tilde A_t+\alpha \tilde k_t+(1-\alpha)\tilde n_t")
+    st.latex(r"\tilde r_t=\tilde y_t-\tilde k_t,\qquad \tilde w_t=\tilde y_t-\tilde n_t")
+    st.latex(r"y^{ss}\tilde y_t=c^{ss}\tilde c_t+i^{ss}\tilde i_t,\qquad \tilde A_t=\rho_A \tilde A_{t-1}+\varepsilon_t")
 **Households**
 
 The representative household maximizes lifetime utility:
@@ -476,3 +507,4 @@ with tabs[3]:
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
         st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+
