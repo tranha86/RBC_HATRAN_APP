@@ -8,7 +8,7 @@ from pathlib import Path
 
 st.set_page_config(page_title="Real Business Cycle Model Simulation", layout="wide")
 
-# ======================= HEADER (no stray whitespace) =======================
+# ======================= HEADER (gọn, không khoảng trắng) =======================
 def _img_b64(path: str) -> str:
     p = Path(path)
     if not p.exists():
@@ -18,7 +18,7 @@ def _img_b64(path: str) -> str:
     return f"data:{mime};base64,{b64}"
 
 def add_header_simple(logo_path: str, title: str, subtitle: str):
-    """Header with one left logo and centered title/subtitle; uses inline HTML safely."""
+    """Header chỉ gồm 1 logo bên trái và 2 dòng chữ, không tạo khoảng trắng."""
     logo = _img_b64(logo_path) if logo_path else ""
     logo_html = f'<img src="{logo}" alt="Logo" style="height:90px;margin-right:16px;">' if logo else ""
     html = (
@@ -28,16 +28,17 @@ def add_header_simple(logo_path: str, title: str, subtitle: str):
         "color:#fff;border-radius:6px;'>"
         f"{logo_html}"
         "<div style='flex:1;text-align:center;'>"
-        f"<div style='font-size:28px;font-weight:700;margin-bottom:8px;'>{title}</div>"
+        f"<div style='font-size:28px;font-weight:700;margin-bottom:8px;'>"
+        f"{title}</div>"
         f"<div style='font-size:20px;font-weight:600;color:#ffd966;'>{subtitle}</div>"
         "</div>"
         "</div>"
     )
     st.markdown(html, unsafe_allow_html=True)
 
-# --- Call header ---
+# --- Gọi header (đổi logo_path='' nếu muốn ẩn logo) ---
 add_header_simple(
-    logo_path="PNG1.png",  # đặt "" nếu không muốn hiện logo
+    logo_path="PNG1.png",
     title="Real Business Cycle Model Simulation (Full RBC)",
     subtitle="National Economics University"
 )
@@ -63,12 +64,13 @@ sigma_e  = st.sidebar.number_input("Shock s.d. σₑ", 0.0, 0.10, 0.01, 0.001, f
 seed_on  = st.sidebar.checkbox("Set random seed", True)
 seed     = st.sidebar.number_input("Seed", 0, 10000, 42, 1)
 
-# ======================= Helpers =======================
+# ======================= Helpers (Kinh tế + Giải) =======================
 def steady_state(alpha, beta, eta, phi, theta, delta):
+    """Trạng thái dừng với A_ss=1. Trả về k,n,y,c,i,r,w."""
     r_ss = 1.0 / beta - (1.0 - delta)
     if r_ss <= 0:
         raise ValueError("Invalid (β, δ): r_ss ≤ 0.")
-    # r = α k^{α-1} n^{1-α}  ⇒  k = [α/r]^{1/(1-α)} · n
+    # Từ r = α k^{α-1} n^{1-α} ⇒ k = [α/r]^{1/(1-α)} · n
     Cn = (alpha / r_ss) ** (1.0 / (1.0 - alpha))
 
     def resid(n):
@@ -113,23 +115,25 @@ def steady_state(alpha, beta, eta, phi, theta, delta):
     return k, n, y, c, i, r_ss, w
 
 def build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss):
+    """Ma trận cho dạng Uhlig; trật tự biến x_t = [y,c,n,w,r,i]."""
     A = np.array([[1.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
     B = np.array([[-(1.0 - delta)], [-alpha], [0.0], [0.0], [1.0], [0.0]])
     C = np.array([
-        [0.0, 0.0, 0.0, 0.0, 0.0, -delta],
-        [1.0, 0.0, -(1.0 - alpha), 0.0, 0.0, 0.0],
-        [0.0, eta, phi, -1.0, 0.0, 0.0],
-        [-1.0, 0.0, 1.0, 1.0, 0.0, 0.0],
-        [-1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-        [-y_ss, c_ss, 0.0, 0.0, 0.0, i_ss]
+        [0.0, 0.0, 0.0, 0.0, 0.0, -delta],           # k_{t+1}-(1-δ)k_t-δ i_t=0
+        [1.0, 0.0, -(1.0 - alpha), 0.0, 0.0, 0.0],   # y = A + αk + (1-α)n
+        [0.0, eta, phi, -1.0, 0.0, 0.0],             # η c + φ n = w
+        [-1.0, 0.0, 1.0, 1.0, 0.0, 0.0],             # w = y - n
+        [-1.0, 0.0, 0.0, 0.0, 1.0, 0.0],             # r = y - k
+        [-y_ss, c_ss, 0.0, 0.0, 0.0, i_ss]           # y_ss y = c_ss c + i_ss i
     ])
-    D = np.array([[0.0], [-1.0], [0.0], [0.0], [0.0], [0.0]])
-    F = 0.0; G = 0.0; H = 0.0; L = 0.0; M = 0.0
+    D = np.array([[0.0], [-1.0], [0.0], [0.0], [0.0], [0.0]])   # TFP vào sản xuất
+    F = 0.0; G = 0.0; H = 0.0; L = 0.0; M = 0.0                  # khối kỳ vọng (Euler)
     J = np.array([[0.0, eta / beta, 0.0, 0.0, -r_ss, 0.0]])
     K = np.array([[0.0, -eta / beta, 0.0, 0.0, 0.0, 0.0]])
     return A, B, C, D, F, G, H, J, K, L, M
 
 def uhlig(alpha, beta, eta, phi, delta, rho_a, y_ss, c_ss, i_ss, r_ss):
+    """Giải P,Q,R,S (1 cú sốc TFP)."""
     A, B, C, D, F, G, H, J, K, L, M = build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss)
     solveC = lambda X: np.linalg.solve(C, X)
 
@@ -162,6 +166,7 @@ def uhlig(alpha, beta, eta, phi, delta, rho_a, y_ss, c_ss, i_ss, r_ss):
     return P, Q, R, S
 
 def irf(P, Q, R, S, rho_a, eps, T, percent=True):
+    """IRF cho cú sốc ε tại t=0, lưu 0..T."""
     T = int(T)
     Atil = np.zeros(T + 1)
     Ktil = np.zeros(T + 1)
@@ -177,16 +182,17 @@ def irf(P, Q, R, S, rho_a, eps, T, percent=True):
         I[t]  = R[5, 0]*Ktil[t] + S[5, 0]*Atil[t]
         Ktil[t + 1] = P*Ktil[t] + Q*Atil[t]
         Atil[t + 1] = rho_a*Atil[t]
+    # điểm cuối
     Y[T]  = R[0, 0]*Ktil[T] + S[0, 0]*Atil[T]
     Cc[T] = R[1, 0]*Ktil[T] + S[1, 0]*Atil[T]
     L[T]  = R[2, 0]*Ktil[T] + S[2, 0]*Atil[T]
     W[T]  = R[3, 0]*Ktil[T] + S[3, 0]*Atil[T]
     Rr[T] = R[4, 0]*Ktil[T] + S[4, 0]*Atil[T]
     I[T]  = R[5, 0]*Ktil[T] + S[5, 0]*Atil[T]
+
     series = {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": Ktil, "A": Atil}
     if percent:
-        for k in series:
-            series[k] = 100.0 * series[k]
+        for k in series: series[k] = 100.0 * series[k]
     return series
 
 def plot_grid(series, T, title):
@@ -202,20 +208,61 @@ def plot_grid(series, T, title):
     st.pyplot(fig)
     st.caption(title)
 
-# ======================= Model Overview =======================
+# ======================= Model Overview (chi tiết) =======================
 with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
-    st.markdown("### Households")
-    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t u(c_t,n_t)")
-    st.latex(r"u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta}-\theta\frac{n_t^{1+\phi}}{1+\phi}")
-    st.latex(r"c_t+i_t=r_t k_t + w_t n_t,\qquad k_{t+1}=(1-\delta)k_t+i_t")
-    st.markdown("### Production")
-    st.latex(r"y_t=A_t k_t^{\alpha} n_t^{1-\alpha}")
-    st.markdown("### Stochastic process")
-    st.latex(r"\log A_t=(1-\rho_A)\log(A^{ss})+\rho_A\log(A_{t-1})+\varepsilon_t,\quad \varepsilon_t\sim\mathcal N(0,\sigma_e^2)")
-    st.markdown("### Equilibrium condition")
-    st.latex(r"y_t = c_t + i_t")
+    # Households
+    st.markdown("## Households / Hộ gia đình đại diện")
+    st.markdown("- Tối đa hóa hữu dụng trọn đời:")
+    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \; \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t \, u(c_t,n_t)")
+    st.latex(r"u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta} \;-\; \theta \frac{n_t^{1+\phi}}{1+\phi}")
+    st.markdown("- Tham số: $0<\beta<1$, $\eta>0$, $\phi>0$, $\\theta>0$.")
 
-# ======================= Compute Steady State & Solution =======================
+    # Budget & Capital
+    st.markdown("### Budget & Capital Accumulation / Ràng buộc ngân sách & tích lũy vốn")
+    st.latex(r"c_t + i_t \;=\; r_t\,k_t \;+\; w_t\,n_t")
+    st.latex(r"k_{t+1} \;=\; (1-\delta)\,k_t \;+\; i_t")
+    st.markdown("- $c_t$: consumption; $i_t$: investment; $k_t$: capital; $n_t$: labor; $r_t$: rental rate; $w_t$: wage; $0<\delta<1$.")
+
+    # Production
+    st.markdown("## Production / Sản xuất")
+    st.latex(r"y_t \;=\; A_t\,k_t^{\alpha}\,n_t^{\,1-\alpha}, \qquad 0<\alpha<1")
+
+    # TFP process
+    st.markdown("## Stochastic Process for TFP / Quá trình ngẫu nhiên của TFP")
+    st.latex(r"\log A_t \;=\; (1-\rho_A)\log A^{ss} \;+\; \rho_A \log A_{t-1} \;+\; \varepsilon_t")
+    st.latex(r"\varepsilon_t \sim \mathcal{N}(0,\sigma_{\varepsilon}^{2}), \qquad 0\le \rho_A<1")
+
+    # Market clearing
+    st.markdown("## Market-Clearing / Cân bằng thị trường")
+    st.latex(r"y_t \;=\; c_t \;+\; i_t")
+
+    # FOCs (nonlinear)
+    st.markdown("## Non-linear First-Order Conditions / Điều kiện bậc nhất (phi tuyến)")
+    st.latex(r"\theta\, c_t^{\eta}\, n_t^{\phi} \;=\; w_t \quad \text{(lao động - nghỉ ngơi)}")
+    st.latex(r"c_t^{-\eta} \;=\; \beta\,\mathbb{E}_t\!\Big[c_{t+1}^{-\eta}\,(1+r_{t+1}-\delta)\Big] \quad \text{(Euler)}")
+    st.latex(r"k_{t+1} \;=\; (1-\delta)k_t \;+\; i_t, \qquad y_t \;=\; A_t k_t^{\alpha} n_t^{\,1-\alpha}")
+    st.latex(r"r_t \;=\; A_t \alpha k_t^{\alpha-1} n_t^{\,1-\alpha}, \quad w_t \;=\; A_t(1-\alpha)k_t^{\alpha} n_t^{-\alpha}")
+
+    # Log-linearization
+    st.markdown("## Log-linearization (Uhlig / Christiano) / Tuyến tính hóa log")
+    st.markdown("Ký hiệu dấu ngã là độ lệch log quanh trạng thái dừng: $\\tilde x_t = \\log x_t - \\log x^{ss}$.")
+    st.latex(r"\eta\,\tilde c_t + \phi\,\tilde n_t = \tilde w_t")
+    st.latex(r"\mathbb{E}_t(\tilde c_{t+1}) - \tilde c_t = \beta r^{ss}\eta\,\mathbb{E}_t(\tilde r_{t+1})")
+    st.latex(r"\tilde k_{t+1} = (1-\delta)\tilde k_t + \delta\,\tilde i_t")
+    st.latex(r"\tilde y_t = \tilde A_t + \alpha\,\tilde k_t + (1-\alpha)\,\tilde n_t")
+    st.latex(r"\tilde r_t = \tilde y_t - \tilde k_t, \qquad \tilde w_t = \tilde y_t - \tilde n_t")
+    st.latex(r"y^{ss}\tilde y_t = c^{ss}\tilde c_t + i^{ss}\tilde i_t, \qquad \tilde A_t = \rho_A \tilde A_{t-1} + \varepsilon_t")
+
+    # Solution method
+    st.markdown("## Solution Method / Phương pháp nghiệm")
+    st.markdown(
+        "- Dùng **Method of Undetermined Coefficients** (Christiano, 2002; Uhlig, 1999) "
+        "để thu được quy tắc: $k_{t+1}=P k_t + Q A_t$, và "
+        "$x_t=R k_t + S A_t$ với $x_t\\in\\{y,c,n,w,r,i\\}$. "
+        "Các ma trận $(P,Q,R,S)$ được tính trong phần dưới và dùng cho IRF & mô phỏng."
+    )
+
+# ======================= Tính SS & nghiệm tuyến tính =======================
 col1, col2 = st.columns([1, 2], gap="large")
 with col2:
     st.markdown("### Steady State & Linear Solution")
@@ -230,74 +277,49 @@ with col2:
         st.stop()
 
 # ======================= Tabs =======================
-# ---------- Model Overview (chi tiết, render LaTeX chuẩn) ----------
-with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
-    # ===== Households =====
-    st.markdown("## Households / Hộ gia đình đại diện")
-    st.markdown(
-        "- The representative household maximizes lifetime utility / "
-        "Hộ gia đình đại diện tối đa hóa hữu dụng trọn đời:"
-    )
-    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \; \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t \, u(c_t,n_t)")
-    st.latex(r"u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta} \;-\; \theta \frac{n_t^{1+\phi}}{1+\phi}")
-    st.markdown(
-        "- Parameters: $0<\beta<1$ (discount), $\eta>0$ (inv. IES), "
-        "$\phi>0$ (Frisch elasticity inverse), $\\theta>0$ (leisure weight)."
-    )
+tabs = st.tabs(["Model Overview", "Steady-State Values", "Impulse Response Functions", "Stochastic Simulation"])
 
-    # ===== Budget & Capital =====
-    st.markdown("### Budget & Capital Accumulation / Ràng buộc ngân sách & tích lũy vốn")
-    st.latex(r"c_t + i_t \;=\; r_t\,k_t \;+\; w_t\,n_t")
-    st.latex(r"k_{t+1} \;=\; (1-\delta)\,k_t \;+\; i_t")
-    st.markdown(
-        "- $c_t$: consumption; $i_t$: investment; $k_t$: capital; $n_t$: labor; "
-        "$r_t$: rental rate of capital; $w_t$: wage; $0<\delta<1$: depreciation."
-    )
+with tabs[0]:
+    st.write("This tab summarizes the model blocks and linear solution.")
 
-    # ===== Production =====
-    st.markdown("## Production / Sản xuất")
-    st.latex(r"y_t \;=\; A_t\,k_t^{\alpha}\,n_t^{\,1-\alpha}, \qquad 0<\alpha<1")
-    st.markdown(
-        "- Competitive firm with Cobb–Douglas technology / Công ty cạnh tranh với công nghệ Cobb–Douglas."
-    )
+with tabs[1]:
+    st.markdown("### Steady-State Values")
+    df = pd.DataFrame({
+        "Variable": ["Interest Rate (r)", "Wage (w)", "Output (y)", "Investment (i)",
+                     "Consumption (c)", "Labor (n)", "Capital (k)"],
+        "Value": [r_ss, w_ss, y_ss, i_ss, c_ss, n_ss, k_ss]
+    })
+    df["Value"] = df["Value"].map(float)
+    st.table(df)
 
-    # ===== Stochastic process =====
-    st.markdown("## Stochastic Process for TFP / Quá trình ngẫu nhiên của TFP")
-    st.latex(r"\log A_t \;=\; (1-\rho_A)\log A^{ss} \;+\; \rho_A \log A_{t-1} \;+\; \varepsilon_t")
-    st.latex(r"\varepsilon_t \sim \mathcal{N}(0,\sigma_{\varepsilon}^{2}), \qquad 0\le \rho_A<1")
-    st.markdown("- $A^{ss}$ is steady-state TFP / $A^{ss}$ là mức TFP trạng thái dừng.")
+with tabs[2]:
+    st.markdown("### Impulse Response Functions")
+    ser = irf(P, Q, R, S, rho_a, impulse, T_irf, percent=True)
+    plot_grid(ser, T_irf, "IRFs to a one-time TFP shock ε at t=0 (log-deviation, %)")
 
-    # ===== Equilibrium conditions =====
-    st.markdown("## Market-Clearing / Cân bằng thị trường")
-    st.latex(r"y_t \;=\; c_t \;+\; i_t")
-
-    # ===== First-order conditions (nonlinear) =====
-    st.markdown("## Non-linear First-Order Conditions / Điều kiện bậc nhất (phi tuyến)")
-    st.latex(r"\theta\, c_t^{\eta}\, n_t^{\phi} \;=\; w_t \quad \text{(intratemporal labor-leisure)}")
-    st.latex(r"c_t^{-\eta} \;=\; \beta\,\mathbb{E}_t\!\Big[c_{t+1}^{-\eta}\,\big(1+r_{t+1}-\delta\big)\Big] \quad \text{(Euler)}")
-    st.latex(r"k_{t+1} \;=\; (1-\delta)k_t \;+\; i_t")
-    st.latex(r"y_t \;=\; A_t k_t^{\alpha} n_t^{\,1-\alpha}")
-    st.latex(r"r_t \;=\; A_t \alpha k_t^{\alpha-1} n_t^{\,1-\alpha}, \qquad w_t \;=\; A_t(1-\alpha)k_t^{\alpha} n_t^{-\alpha}")
-
-    # ===== Log-linearization =====
-    st.markdown("## Log-linearization (Uhlig / Christiano) / Tuyến tính hóa log")
-    st.markdown(
-        "Let tildes denote log-deviations from steady state: "
-        "$\\tilde x_t = \\log x_t - \\log x^{ss}$. Then the linearized system:"
-    )
-    st.latex(r"\eta\,\tilde c_t \;+\; \phi\,\tilde n_t \;=\; \tilde w_t")
-    st.latex(r"\mathbb{E}_t(\tilde c_{t+1}) - \tilde c_t \;=\; \beta r^{ss}\eta\,\mathbb{E}_t(\tilde r_{t+1})")
-    st.latex(r"\tilde k_{t+1} \;=\; (1-\delta)\tilde k_t \;+\; \delta\,\tilde i_t")
-    st.latex(r"\tilde y_t \;=\; \tilde A_t \;+\; \alpha\,\tilde k_t \;+\; (1-\alpha)\,\tilde n_t")
-    st.latex(r"\tilde r_t \;=\; \tilde y_t - \tilde k_t, \qquad \tilde w_t \;=\; \tilde y_t - \tilde n_t")
-    st.latex(r"y^{ss}\,\tilde y_t \;=\; c^{ss}\,\tilde c_t \;+\; i^{ss}\,\tilde i_t, \qquad \tilde A_t \;=\; \rho_A \tilde A_{t-1} + \varepsilon_t")
-
-    # ===== Solution method =====
-    st.markdown("## Solution Method / Phương pháp nghiệm")
-    st.markdown(
-        "- We use the **Method of Undetermined Coefficients** (Christiano, 2002; Uhlig, 1999) "
-        "to solve the linearized system for policy rules "
-        "$k_{t+1} = P\\,k_t + Q\\,A_t$, $x_t = R\\,k_t + S\\,A_t$ for "
-        "$x_t\\in\\{y_t,c_t,n_t,w_t,r_t,i_t\\}$. "
-        "These matrices $(P,Q,R,S)$ được tính trong phần mã bên dưới và dùng để tạo IRF & mô phỏng."
-    )
+with tabs[3]:
+    st.markdown("### Stochastic Simulation (AR(1) TFP shocks)")
+    if stoch_on:
+        if seed_on:
+            np.random.seed(int(seed))
+        eps = np.random.normal(0.0, sigma_e, size=T_sim)
+        A = np.zeros(T_sim + 1); K = np.zeros(T_sim + 1)
+        Y = np.zeros(T_sim + 1); Cc = np.zeros(T_sim + 1); L = np.zeros(T_sim + 1)
+        W = np.zeros(T_sim + 1); Rr = np.zeros(T_sim + 1); I = np.zeros(T_sim + 1)
+        for t in range(T_sim):
+            Y[t]  = R[0, 0]*K[t] + S[0, 0]*A[t]
+            Cc[t] = R[1, 0]*K[t] + S[1, 0]*A[t]
+            L[t]  = R[2, 0]*K[t] + S[2, 0]*A[t]
+            W[t]  = R[3, 0]*K[t] + S[3, 0]*A[t]
+            Rr[t] = R[4, 0]*K[t] + S[4, 0]*A[t]
+            I[t]  = R[5, 0]*K[t] + S[5, 0]*A[t]
+            K[t + 1] = P*K[t] + Q*A[t]
+            A[t + 1] = rho_a*A[t] + eps[t]
+        ser2 = {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": K, "A": A}
+        for k in ser2:
+            ser2[k] = 100.0 * np.array(ser2[k])
+        T_show = min(200, T_sim)
+        plot_grid({kk: vv[:T_show + 1] for kk, vv in ser2.items()}, T_show,
+                  "Sample path (first 200 periods shown), units: % log-deviation")
+    else:
+        st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
