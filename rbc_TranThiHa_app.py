@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import base64
 from pathlib import Path
 import streamlit as st
-
+from textwrap import dedent 
 st.set_page_config(page_title="Real Business Cycle Model Simulation", layout="wide")
 
 # ---------- Header with (optional) logos ----------
@@ -33,34 +33,32 @@ def add_header(left_logo: str,
     right_html = img_tag(right_logo)
     bottom_html = f'<div class="app-subtitle-bottom">{subtitle_bottom}</div>' if subtitle_bottom else ""
 
-    st.markdown(
-        f"""
-        <style>
-        .app-header {{
-            display:flex;justify-content:space-between;align-items:center;
-            padding:15px 40px;background:linear-gradient(90deg,#2b5876,#4e4376);
-            border-bottom:3px solid #e0e0e0;box-shadow:0 4px 12px rgba(0,0,0,.15);
-            color:#fff;
-        }}
-        .app-header img {{height:90px}}
-        .app-center {{text-align:center;flex-grow:1;margin:0 30px}}
-        .app-title {{font-size:28px;font-weight:700;margin-bottom:8px}}
-        .app-subtitle-top {{font-size:20px;font-weight:600;color:#ffd966}}
-        .app-subtitle-bottom {{font-size:18px;font-weight:500;color:#ffecb3}}
-        </style>
-        <div class="app-header">
-            {left_html}
-            <div class="app-center">
-                <div class="app-title">{title}</div>
-                <div class="app-subtitle-top">{subtitle_top}</div>
-                {bottom_html}
-            </div>
-            {right_html}
+    html = dedent(f"""
+    <style>
+    .app-header {{
+        display:flex;justify-content:space-between;align-items:center;
+        padding:15px 40px;background:linear-gradient(90deg,#2b5876,#4e4376);
+        border-bottom:3px solid #e0e0e0;box-shadow:0 4px 12px rgba(0,0,0,.15);
+        color:#fff;
+    }}
+    .app-header img {{height:90px}}
+    .app-center {{text-align:center;flex-grow:1;margin:0 30px}}
+    .app-title {{font-size:28px;font-weight:700;margin-bottom:8px}}
+    .app-subtitle-top {{font-size:20px;font-weight:600;color:#ffd966}}
+    .app-subtitle-bottom {{font-size:18px;font-weight:500;color:#ffecb3}}
+    </style>
+    <div class="app-header">
+        {left_html}
+        <div class="app-center">
+            <div class="app-title">{title}</div>
+            <div class="app-subtitle-top">{subtitle_top}</div>
+            {bottom_html}
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+        {right_html}
+    </div>
+    """)
 
+    st.markdown(html, unsafe_allow_html=True)
 # --- Call header (only NEU logo & name; no faculty line, no right logo) ---
 add_header(
     left_logo="PNG1.png",
@@ -365,6 +363,7 @@ with tabs[3]:
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
         st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+
 
 
 
