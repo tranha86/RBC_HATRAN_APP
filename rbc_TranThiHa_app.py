@@ -238,14 +238,14 @@ with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=T
 
     # FOCs (nonlinear)
     st.markdown("## Non-linear First-Order Conditions / Điều kiện bậc nhất (phi tuyến)")
-    st.latex(r"\theta\, c_t^{\eta}\, n_t^{\phi} \;=\; w_t \quad \text{(lao động - nghỉ ngơi)}")
+    st.latex(r"\theta\, c_t^{\eta}\, n_t^{\phi} \;=\; w_t \quad \text{(labor- Leisure)}")
     st.latex(r"c_t^{-\eta} \;=\; \beta\,\mathbb{E}_t\!\Big[c_{t+1}^{-\eta}\,(1+r_{t+1}-\delta)\Big] \quad \text{(Euler)}")
     st.latex(r"k_{t+1} \;=\; (1-\delta)k_t \;+\; i_t, \qquad y_t \;=\; A_t k_t^{\alpha} n_t^{\,1-\alpha}")
     st.latex(r"r_t \;=\; A_t \alpha k_t^{\alpha-1} n_t^{\,1-\alpha}, \quad w_t \;=\; A_t(1-\alpha)k_t^{\alpha} n_t^{-\alpha}")
 
     # Log-linearization
     st.markdown("## Log-linearization (Uhlig / Christiano) / Tuyến tính hóa log")
-    st.markdown("Ký hiệu dấu ngã là độ lệch log quanh trạng thái dừng: $\\tilde x_t = \\log x_t - \\log x^{ss}$.")
+    st.markdown("The tilde ( ~ ) denotes the log-deviation from the steady state: $\\tilde x_t = \\log x_t - \\log x^{ss}$.")
     st.latex(r"\eta\,\tilde c_t + \phi\,\tilde n_t = \tilde w_t")
     st.latex(r"\mathbb{E}_t(\tilde c_{t+1}) - \tilde c_t = \beta r^{ss}\eta\,\mathbb{E}_t(\tilde r_{t+1})")
     st.latex(r"\tilde k_{t+1} = (1-\delta)\tilde k_t + \delta\,\tilde i_t")
@@ -256,10 +256,10 @@ with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=T
     # Solution method
     st.markdown("## Solution Method / Phương pháp nghiệm")
     st.markdown(
-        "- Dùng **Method of Undetermined Coefficients** (Christiano, 2002; Uhlig, 1999) "
-        "để thu được quy tắc: $k_{t+1}=P k_t + Q A_t$, và "
+        "- Use the Method of Undetermined Coefficients (Christiano, 2002; Uhlig, 1999)  "
+        "to derive the policy rules: $k_{t+1}=P k_t + Q A_t$, và "
         "$x_t=R k_t + S A_t$ với $x_t\\in\\{y,c,n,w,r,i\\}$. "
-        "Các ma trận $(P,Q,R,S)$ được tính trong phần dưới và dùng cho IRF & mô phỏng."
+        "The matrices (𝑃,𝑄,𝑅,𝑆) $(P,Q,R,S)$ are computed in the section below and used for IRFs and simulations.."
     )
 
 # ======================= Tính SS & nghiệm tuyến tính =======================
@@ -323,3 +323,4 @@ with tabs[3]:
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
         st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+
