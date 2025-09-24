@@ -8,7 +8,7 @@ from pathlib import Path
 
 st.set_page_config(page_title="Real Business Cycle Model Simulation", layout="wide")
 
-# ======================= HEADER (gọn, không khoảng trắng) =======================
+# ======================= HEADER (no stray whitespace) =======================
 def _img_b64(path: str) -> str:
     p = Path(path)
     if not p.exists():
@@ -18,14 +18,14 @@ def _img_b64(path: str) -> str:
     return f"data:{mime};base64,{b64}"
 
 def add_header_simple(logo_path: str, title: str, subtitle: str):
-    """Header chỉ gồm 1 logo bên trái và 2 dòng chữ, không tạo khoảng trắng."""
-    logo = _img_b64(logo_path)
-    logo_html = f'<img src="{logo}" alt="Logo" style="height:90px;">' if logo else ""
+    """Header with one left logo and centered title/subtitle; uses inline HTML safely."""
+    logo = _img_b64(logo_path) if logo_path else ""
+    logo_html = f'<img src="{logo}" alt="Logo" style="height:90px;margin-right:16px;">' if logo else ""
     html = (
         "<div style='display:flex;align-items:center;justify-content:flex-start;"
         "padding:15px 40px;background:linear-gradient(90deg,#2b5876,#4e4376);"
         "border-bottom:3px solid #e0e0e0;box-shadow:0 4px 12px rgba(0,0,0,.15);"
-        "color:#fff;'>"
+        "color:#fff;border-radius:6px;'>"
         f"{logo_html}"
         "<div style='flex:1;text-align:center;'>"
         f"<div style='font-size:28px;font-weight:700;margin-bottom:8px;'>{title}</div>"
@@ -35,9 +35,9 @@ def add_header_simple(logo_path: str, title: str, subtitle: str):
     )
     st.markdown(html, unsafe_allow_html=True)
 
-# --- Gọi header ---
+# --- Call header ---
 add_header_simple(
-    logo_path="PNG1.png",
+    logo_path="PNG1.png",  # đặt "" nếu không muốn hiện logo
     title="Real Business Cycle Model Simulation (Full RBC)",
     subtitle="National Economics University"
 )
@@ -68,6 +68,7 @@ def steady_state(alpha, beta, eta, phi, theta, delta):
     r_ss = 1.0 / beta - (1.0 - delta)
     if r_ss <= 0:
         raise ValueError("Invalid (β, δ): r_ss ≤ 0.")
+    # r = α k^{α-1} n^{1-α}  ⇒  k = [α/r]^{1/(1-α)} · n
     Cn = (alpha / r_ss) ** (1.0 / (1.0 - alpha))
 
     def resid(n):
@@ -84,6 +85,7 @@ def steady_state(alpha, beta, eta, phi, theta, delta):
     a, b = 1e-4, 0.95
     fa, fb = resid(a), resid(b)
     if np.sign(fa) == np.sign(fb):
+        # fallback an toàn
         n = 1.0 / 3.0
         k = Cn * n
         y = (k ** alpha) * (n ** (1 - alpha))
@@ -122,7 +124,7 @@ def build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss):
         [-y_ss, c_ss, 0.0, 0.0, 0.0, i_ss]
     ])
     D = np.array([[0.0], [-1.0], [0.0], [0.0], [0.0], [0.0]])
-    F = G = H = L = M = 0.0
+    F = 0.0; G = 0.0; H = 0.0; L = 0.0; M = 0.0
     J = np.array([[0.0, eta / beta, 0.0, 0.0, -r_ss, 0.0]])
     K = np.array([[0.0, -eta / beta, 0.0, 0.0, 0.0, 0.0]])
     return A, B, C, D, F, G, H, J, K, L, M
@@ -130,14 +132,32 @@ def build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss):
 def uhlig(alpha, beta, eta, phi, delta, rho_a, y_ss, c_ss, i_ss, r_ss):
     A, B, C, D, F, G, H, J, K, L, M = build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss)
     solveC = lambda X: np.linalg.solve(C, X)
+
+    # P từ phương trình bậc hai
     a = float(F - J @ solveC(A))
     b = float(-(J @ solveC(B) - G + K @ solveC(A)))
     c = float(-K @ solveC(B) + H)
-    disc = b * b - 4 * a * c
-    P = float((-(b) + np.sqrt(disc)) / (2 * a) if a != 0 else 0.0)
+    disc = b*b - 4*a*c
+    if disc < 0:
+        disc = np.real(disc)
+    P1 = (-b + np.sqrt(disc)) / (2*a) if a != 0 else 0.0
+    P2 = (-b - np.sqrt(disc)) / (2*a) if a != 0 else 0.0
+    P  = float(P1 if abs(P1) <= abs(P2) else P2)
+
+    # R
     R = -solveC(A * P + B)
-    Q = float(((J @ solveC(D)) * rho_a + K @ solveC(D) - M) /
-              (rho_a * (F - J @ solveC(A)) + (J @ R + F * P + G - K @ solveC(A))))
+
+    # Q (scalar)
+    JC_A = float(J @ solveC(A))
+    KC_A = float(K @ solveC(A))
+    JC_D = float(J @ solveC(D))
+    KC_D = float(K @ solveC(D))
+    JR   = float(J @ R)
+    LHS = rho_a * (F - JC_A) + (JR + F*P + G - KC_A)
+    RHS = (JC_D - L) * rho_a + KC_D - M
+    Q = float(RHS / LHS)
+
+    # S
     S = -solveC(A * Q + D)
     return P, Q, R, S
 
@@ -165,7 +185,8 @@ def irf(P, Q, R, S, rho_a, eps, T, percent=True):
     I[T]  = R[5, 0]*Ktil[T] + S[5, 0]*Atil[T]
     series = {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": Ktil, "A": Atil}
     if percent:
-        for k in series: series[k] = 100.0 * series[k]
+        for k in series:
+            series[k] = 100.0 * series[k]
     return series
 
 def plot_grid(series, T, title):
@@ -173,7 +194,7 @@ def plot_grid(series, T, title):
     fig = plt.figure(figsize=(10, 9))
     for i, lab in enumerate(labels, start=1):
         ax = fig.add_subplot(3, 3, i)
-        ax.plot(np.arange(T + 1), series[lab][:T + 1])
+        ax.plot(np.arange(T + 1), series[lab][:T + 1], linewidth=1.2)
         ax.axhline(0.0, linewidth=0.8)
         ax.set_title(lab)
         ax.grid(True, linewidth=0.3)
@@ -184,13 +205,13 @@ def plot_grid(series, T, title):
 # ======================= Model Overview =======================
 with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
     st.markdown("### Households")
-    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} E_0\sum_{t=0}^\infty \beta^t u(c_t,n_t)")
+    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t u(c_t,n_t)")
     st.latex(r"u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta}-\theta\frac{n_t^{1+\phi}}{1+\phi}")
-    st.latex(r"c_t+i_t=r_t k_t + w_t n_t,\qquad k_{t+1}=(1-\delta)k_t + i_t")
+    st.latex(r"c_t+i_t=r_t k_t + w_t n_t,\qquad k_{t+1}=(1-\delta)k_t+i_t")
     st.markdown("### Production")
     st.latex(r"y_t=A_t k_t^{\alpha} n_t^{1-\alpha}")
     st.markdown("### Stochastic process")
-    st.latex(r"\log A_t=(1-\rho_A)\log A^{ss} + \rho_A \log A_{t-1} + \varepsilon_t,\quad \varepsilon_t\sim\mathcal N(0,\sigma_e^2)")
+    st.latex(r"\log A_t=(1-\rho_A)\log(A^{ss})+\rho_A\log(A_{t-1})+\varepsilon_t,\quad \varepsilon_t\sim\mathcal N(0,\sigma_e^2)")
     st.markdown("### Equilibrium condition")
     st.latex(r"y_t = c_t + i_t")
 
@@ -209,12 +230,10 @@ with col2:
         st.stop()
 
 # ======================= Tabs =======================
-tabs = st.tabs([
-    "Model Overview",
-    "Steady-State Values",
-    "Impulse Response Functions",
-    "Stochastic Simulation"
-])
+tabs = st.tabs(["Model Overview", "Steady-State Values", "Impulse Response Functions", "Stochastic Simulation"])
+
+with tabs[0]:
+    st.write("This tab summarizes the model blocks and linear solution.")
 
 with tabs[1]:
     st.markdown("### Steady-State Values")
@@ -234,7 +253,8 @@ with tabs[2]:
 with tabs[3]:
     st.markdown("### Stochastic Simulation (AR(1) TFP shocks)")
     if stoch_on:
-        if seed_on: np.random.seed(int(seed))
+        if seed_on:
+            np.random.seed(int(seed))
         eps = np.random.normal(0.0, sigma_e, size=T_sim)
         A = np.zeros(T_sim + 1); K = np.zeros(T_sim + 1)
         Y = np.zeros(T_sim + 1); Cc = np.zeros(T_sim + 1); L = np.zeros(T_sim + 1)
@@ -248,5 +268,11 @@ with tabs[3]:
             I[t]  = R[5, 0]*K[t] + S[5, 0]*A[t]
             K[t + 1] = P*K[t] + Q*A[t]
             A[t + 1] = rho_a*A[t] + eps[t]
-        ser2 = {k: 100.0 * v for k, v in
-                {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": K, "A": A
+        ser2 = {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": K, "A": A}
+        for k in ser2:
+            ser2[k] = 100.0 * np.array(ser2[k])
+        T_show = min(200, T_sim)
+        plot_grid({kk: vv[:T_show + 1] for kk, vv in ser2.items()}, T_show,
+                  "Sample path (first 200 periods shown), units: % log-deviation")
+    else:
+        st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
