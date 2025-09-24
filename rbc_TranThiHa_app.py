@@ -1,92 +1,73 @@
-# rbc_uhlig_app.py
+# rbc_TranThiHa_app.py
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-import streamlit as st       # <— import st TRƯỚC khi dùng
-import base64
-from pathlib import Path
-
 import base64
 from pathlib import Path
 import streamlit as st
+
 st.set_page_config(page_title="Real Business Cycle Model Simulation", layout="wide")
 
+# ---------- Header with (optional) logos ----------
 def _img_to_data_url(p: Path) -> str:
-    if not p.exists():
+    if not p or not p.exists():
         return ""
-    ext = p.suffix.lower()
-    mime = "image/png" if ext == ".png" else "image/jpeg"
+    mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
     b64 = base64.b64encode(p.read_bytes()).decode("utf-8")
     return f"data:{mime};base64,{b64}"
 
-def add_header(left_logo: str, right_logo: str,
+def add_header(left_logo: str,
                title: str,
                subtitle_top: str,
-               subtitle_bottom: str):
-    left_src  = _img_to_data_url(Path(left_logo))
-    right_src = _img_to_data_url(Path(right_logo))
+               subtitle_bottom: str = "",
+               right_logo: str = ""):
+    """
+    Header: left logo + centered titles; right logo is optional.
+    subtitle_bottom left empty to hide 'Faculty/Department' line.
+    """
+    left_src  = _img_to_data_url(Path(left_logo)) if left_logo else ""
+    right_src = _img_to_data_url(Path(right_logo)) if right_logo else ""
 
     st.markdown(
         f"""
         <style>
         .app-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
             padding: 15px 40px;
             background: linear-gradient(90deg, #2b5876, #4e4376);
             border-bottom: 3px solid #e0e0e0;
             box-shadow: 0 4px 12px rgba(0,0,0,.15);
             color: white;
         }}
-        .app-header img {{
-            height: 90px;
-        }}
-        .app-center {{
-            text-align: center;
-            flex-grow: 1;
-            margin: 0 30px;
-        }}
-        .app-title {{
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }}
-        .app-subtitle-top {{
-            font-size: 20px;
-            font-weight: 600;
-            color: #ffd966; /* vàng nhẹ */
-        }}
-        .app-subtitle-bottom {{
-            font-size: 18px;
-            font-weight: 500;
-            color: #ffecb3; /* vàng sáng */
-        }}
+        .app-header img {{ height: 90px; }}
+        .app-center {{ text-align: center; flex-grow: 1; margin: 0 30px; }}
+        .app-title {{ font-size: 28px; font-weight: 700; margin-bottom: 8px; }}
+        .app-subtitle-top {{ font-size: 20px; font-weight: 600; color: #ffd966; }}
+        .app-subtitle-bottom {{ font-size: 18px; font-weight: 500; color: #ffecb3; }}
         </style>
         <div class="app-header">
-            <img src="{left_src}" alt="Math Econ Logo">
+            {f'<img src="{left_src}" alt="Left Logo">' if left_src else ''}
             <div class="app-center">
                 <div class="app-title">{title}</div>
                 <div class="app-subtitle-top">{subtitle_top}</div>
-                <div class="app-subtitle-bottom">{subtitle_bottom}</div>
+                {f'<div class="app-subtitle-bottom">{subtitle_bottom}</div>' if subtitle_bottom else ''}
             </div>
-            <img src="{right_src}" alt="NEU Logo">
+            {f'<img src="{right_src}" alt="Right Logo">' if right_src else ''}
         </div>
         """,
         unsafe_allow_html=True
     )
 
-# --- Gọi hàm header ---
-
+# --- Call header (only NEU logo & name; no faculty line, no right logo) ---
 add_header(
-    left_logo="PNG1.png",
+    left_logo="PNG1.png",                         # logo trường (đặt trong repo)
     title="Real Business Cycle Model Simulation (Full RBC)",
-    subtitle_top="National Economics University",
-    
+    subtitle_top="National Economics University", # chỉ tên trường
+    subtitle_bottom="",                            # ẩn dòng 'Faculty'
+    right_logo=""                                  # không hiện logo phải
 )
 
-# ========== Sidebar: parameters ==========
+# ---------- Sidebar: parameters ----------
 st.sidebar.header("Model Parameters")
 alpha = st.sidebar.number_input("Capital Share (α)", 0.05, 0.95, 0.35, 0.01, format="%.3f")
 beta  = st.sidebar.number_input("Discount Factor (β)", 0.90, 0.999, 0.985, 0.001, format="%.3f")
@@ -107,15 +88,12 @@ sigma_e  = st.sidebar.number_input("Shock s.d. σₑ", 0.0, 0.10, 0.01, 0.001, f
 seed_on  = st.sidebar.checkbox("Set random seed", True)
 seed     = st.sidebar.number_input("Seed", 0, 10000, 42, 1)
 
-# ========== Helpers ==========
+# ---------- Helpers ----------
 def steady_state(alpha, beta, eta, phi, theta, delta):
-    """
-    Solve steady state for (k, n, y, c, i, r, w) with A_ss = 1.
-    Use r_ss from Euler; express k = Cn*n from capital FOC; solve n from intratemporal FOC.
-    """
+    """Solve steady state for (k, n, y, c, i, r, w) with A_ss = 1."""
     r_ss = 1.0 / beta - (1.0 - delta)
     if r_ss <= 0:
-        raise ValueError("Invalid (β, δ): r_ss ≤ 0. Choose β high enough and/or δ small enough.")
+        raise ValueError("Invalid (β, δ): r_ss ≤ 0.")
 
     # From r = α k^{α-1} n^{1-α}  ⇒  k = [α/r]^{1/(1-α)} · n
     Cn = (alpha / r_ss) ** (1.0 / (1.0 - alpha))
@@ -131,11 +109,10 @@ def steady_state(alpha, beta, eta, phi, theta, delta):
         lhs = theta * (c ** eta) * (n ** phi)
         return lhs - w
 
-    # bracket for n via bisection + soft fallback
+    # bisection for n
     a, b = 1e-4, 0.95
     fa, fb = resid(a), resid(b)
     if np.sign(fa) == np.sign(fb):
-        # try scaling theta to get a bracket (keeps app robust)
         found = False
         for mult in [0.5, 1, 2, 5, 10]:
             def resid2(n):
@@ -154,7 +131,6 @@ def steady_state(alpha, beta, eta, phi, theta, delta):
                 found = True
                 break
         if not found:
-            # fallback, not ideal but avoids crashing
             n = 1.0 / 3.0
             k = Cn * n
             y = (k ** alpha) * (n ** (1 - alpha))
@@ -194,8 +170,7 @@ def build_mats(alpha, beta, eta, phi, delta, y_ss, c_ss, i_ss, r_ss):
         [-y_ss, c_ss, 0.0, 0.0, 0.0, i_ss]           # y_ss y = c_ss c + i_ss i
     ])
     D = np.array([[0.0], [-1.0], [0.0], [0.0], [0.0], [0.0]])   # A_t only in production
-    # Expectational block (Euler only)
-    F = 0.0; G = 0.0; H = 0.0; L = 0.0; M = 0.0
+    F = 0.0; G = 0.0; H = 0.0; L = 0.0; M = 0.0                  # Expectational block (Euler)
     J = np.array([[0.0, eta / beta, 0.0, 0.0, -r_ss, 0.0]])
     K = np.array([[0.0, -eta / beta, 0.0, 0.0, 0.0, 0.0]])
     return A, B, C, D, F, G, H, J, K, L, M
@@ -225,8 +200,8 @@ def uhlig(alpha, beta, eta, phi, delta, rho_a, y_ss, c_ss, i_ss, r_ss):
     JC_D = float(J @ Csolve(D))
     KC_D = float(K @ Csolve(D))
     JR   = float(J @ R)
-    LHS = rho_a * (F - JC_A) + (JR + F * P + G - KC_A)   # -> -rho*JC_A + (JR - KC_A)
-    RHS = (JC_D - L) * rho_a + KC_D - M                  # -> rho*JC_D + KC_D
+    LHS = rho_a * (F - JC_A) + (JR + F * P + G - KC_A)
+    RHS = (JC_D - L) * rho_a + KC_D - M
     Q = float(RHS / LHS)
 
     # S
@@ -234,9 +209,7 @@ def uhlig(alpha, beta, eta, phi, delta, rho_a, y_ss, c_ss, i_ss, r_ss):
     return P, Q, R, S
 
 def irf(P, Q, R, S, rho_a, eps, T, percent=True):
-    """
-    IRF for a one-time shock ε at t=0 (store 0..T).
-    """
+    """IRF for a one-time shock ε at t=0 (store 0..T)."""
     T = int(T)
     Atil = np.zeros(T + 1)
     Ktil = np.zeros(T + 1)
@@ -280,7 +253,7 @@ def plot_grid(series, T, title):
     st.pyplot(fig)
     st.caption(title)
 
-# ========== Top: Model Overview (rich) ==========
+# ---------- Top: Model Overview ----------
 with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
     st.markdown("### Households")
     st.markdown("The representative household maximizes lifetime utility:")
@@ -288,7 +261,6 @@ with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=T
     \max_{\{c_t,k_{t+1},n_t\}} \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t u(c_t,n_t),\quad
     u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta}-\theta\frac{n_t^{1+\phi}}{1+\phi}
     """)
-
     st.markdown("**Budget and capital accumulation:**")
     st.latex(r"c_t+i_t=r_tk_t+w_t n_t,\qquad k_{t+1}=(1-\delta)k_t+i_t")
 
@@ -316,130 +288,13 @@ with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=T
     st.latex(r"\tilde y_t=\tilde A_t+\alpha \tilde k_t+(1-\alpha)\tilde n_t")
     st.latex(r"\tilde r_t=\tilde y_t-\tilde k_t,\qquad \tilde w_t=\tilde y_t-\tilde n_t")
     st.latex(r"y^{ss}\tilde y_t=c^{ss}\tilde c_t+i^{ss}\tilde i_t,\qquad \tilde A_t=\rho_A \tilde A_{t-1}+\varepsilon_t")
-**Households**
 
-The representative household maximizes lifetime utility:
-\[
-\max_{\{c_t,k_{t+1},n_t\}} \; \mathbb E_0 \sum_{t=0}^{\infty} \beta^t\, u(c_t,n_t),
-\quad 
-u(c_t,n_t) = \frac{c_t^{1-\eta}-1}{1-\eta} - \theta \frac{n_t^{1+\phi}}{1+\phi}.
-\]
-
-Budget and capital accumulation:
-\[
-c_t + i_t = r_t k_t + w_t n_t,\qquad
-k_{t+1} = (1-\delta)k_t + i_t.
-\]
-
-**Production**
-
-\[
-y_t = A_t k_t^{\alpha} n_t^{1-\alpha}.
-\]
-
-**Stochastic process**
-
-\[
-\log(A_t) = (1-\rho_A)\log(A^{ss}) + \rho_A \log(A_{t-1}) + \varepsilon_t,\quad
-\varepsilon_t \sim \mathcal N(0,\sigma_e^2).
-\]
-
-**Equilibrium condition**
-
-\[
-y_t = c_t + i_t.
-\]
-
-**Non-linear Equations**
-
-\[
-\theta\, c_t^{\eta} n_t^{\phi} = w_t,\quad
-c_t^{-\eta} = \beta\, \mathbb E_t\!\left[c_{t+1}^{-\eta}(1+r_{t+1}-\delta)\right],
-\]
-\[
-k_{t+1} = (1-\delta)k_t + i_t,\quad
-y_t = A_t k_t^{\alpha} n_t^{1-\alpha},
-\]
-\[
-r_t = A_t \alpha k_t^{\alpha-1} n_t^{1-\alpha},\quad
-w_t = A_t (1-\alpha) k_t^{\alpha} n_t^{-\alpha},\quad
-y_t = c_t + i_t.
-\]
-
-**Log-linearized (Uhlig rules; tildes = log-deviation from steady state)**
-
-\[
-\eta \tilde c_t + \phi \tilde n_t = \tilde w_t,\quad
-\mathbb E_t(\tilde c_{t+1}) - \tilde c_t = \beta r^{ss}\eta\,\mathbb E_t(\tilde r_{t+1}),
-\]
-\[
-\tilde k_{t+1} = (1-\delta)\tilde k_t + \delta \tilde i_t,\quad
-\tilde y_t = \tilde A_t + \alpha \tilde k_t + (1-\alpha)\tilde n_t,
-\]
-\[
-\tilde r_t = \tilde y_t - \tilde k_t,\quad
-\tilde w_t = \tilde y_t - \tilde n_t,
-\]
-\[
-\frac{y^{ss}}{\,}\tilde y_t = \frac{c^{ss}}{\,}\tilde c_t + \frac{i^{ss}}{\,}\tilde i_t,\quad
-\tilde A_t = \rho_A \tilde A_{t-1} + \varepsilon_t.
-\]
-
-Solution uses the **Method of Undetermined Coefficients** (Christiano, 2002) / Uhlig’s linearization.
-"""
-    )
-
-# ========== Compute SS & Solution ==========
+# ---------- Compute SS & Solution ----------
 col1, col2 = st.columns([1, 2], gap="large")
+
 with col1:
-    st.markdown("### Model Overview")
-    st.write("**Households**")
-    st.write("The representative household maximizes lifetime utility:")
-    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t u(c_t,n_t)")
-    st.write("where the instantaneous utility function is:")
-    st.latex(r"u(c_t,n_t) = \frac{c_t^{1-\eta}-1}{1-\eta} - \theta \frac{n_t^{1+\phi}}{1+\phi}")
-    st.write("subject to the budget constraint:")
-    st.latex(r"c_t + i_t = r_t k_t + w_t n_t")
-    st.write("and the law of motion for capital:")
-    st.latex(r"k_{t+1} = (1-\delta) k_t + i_t")
-
-    st.markdown("---")
-    st.write("**Production**")
-    st.write("The production function is Cobb–Douglas:")
-    st.latex(r"y_t = A_t k_t^{\alpha} n_t^{1-\alpha}")
-
-    st.markdown("---")
-    st.write("**Stochastic process**")
-    st.write("The technology shock follows an AR(1) process in logs:")
-    st.latex(r"\log(A_t) = (1-\rho_A)\log(A^{ss}) + \rho_A \log(A_{t-1}) + \varepsilon_t,\quad \varepsilon_t \sim \mathcal{N}(0,\sigma_e^2)")
-
-    st.markdown("---")
-    st.write("**Equilibrium condition**")
-    st.latex(r"y_t = c_t + i_t")
-
-    st.markdown("---")
-    st.write("**Non-linear Model Equations**")
-    st.latex(r"\theta c_t^{\eta} n_t^{\phi} = w_t")
-    st.latex(r"c_t^{-\eta} = \beta \mathbb{E}_t \big[c_{t+1}^{-\eta}(1 + r_{t+1} - \delta)\big]")
-    st.latex(r"k_{t+1} = (1-\delta) k_t + i_t")
-    st.latex(r"y_t = A_t k_t^{\alpha} n_t^{1-\alpha}")
-    st.latex(r"r_t = A_t \alpha k_t^{\alpha-1} n_t^{1-\alpha}")
-    st.latex(r"w_t = A_t (1-\alpha) k_t^{\alpha} n_t^{-\alpha}")
-    st.latex(r"y_t = c_t + i_t")
-
-    st.markdown("---")
-    st.write("**Log-linearized Model Equations**")
-    st.write("Variables with a tilde denote log-deviations from the steady state:")
-    st.latex(r"\tilde x_t = \log x_t - \log x^{ss}")
-    st.write("Using Uhlig (1999)'s rules, the linearized version of the model is:")
-    st.latex(r"\eta \tilde c_t + \phi \tilde n_t = \tilde w_t")
-    st.latex(r"\mathbb{E}_t (\tilde c_{t+1}) - \tilde c_t = \beta r^{ss} \eta \mathbb{E}_t (\tilde r_{t+1})")
-    st.latex(r"\tilde k_{t+1} = (1 - \delta) \tilde k_t + \delta \tilde i_t")
-    st.latex(r"\tilde y_t = \tilde A_t + \alpha \tilde k_t + (1 - \alpha) \tilde n_t")
-    st.latex(r"\tilde r_t = \tilde y_t - \tilde k_t")
-    st.latex(r"\tilde w_t = \tilde y_t - \tilde n_t")
-    st.latex(r"y^{ss}\tilde y_t = c^{ss}\tilde c_t + i^{ss}\tilde i_t")
-    st.latex(r"\tilde A_t = \rho_A \tilde A_{t-1} + \varepsilon_t")
+    st.markdown("### Model Overview (quick recap)")
+    st.write("Adjust parameters in the sidebar and explore the IRFs / simulations.")
 
 with col2:
     st.markdown("### Steady State & Linear Solution")
@@ -453,7 +308,7 @@ with col2:
         st.error(f"Steady state / solution error: {e}")
         st.stop()
 
-# ========== Tabs ==========
+# ---------- Tabs ----------
 tabs = st.tabs([
     "Model Overview",
     "Steady-State Values",
@@ -462,7 +317,7 @@ tabs = st.tabs([
 ])
 
 with tabs[0]:
-    st.write("Tab này tóm tắt các khối của mô hình và dạng nghiệm tuyến tính. Điều chỉnh tham số ở trái để quan sát thay đổi.")
+    st.write("This tab summarizes the model blocks and linear solution. See above.")
 
 with tabs[1]:
     st.markdown("### Steady-State Values")
@@ -502,7 +357,7 @@ with tabs[3]:
         ser2 = {"Y": Y, "C": C, "L": L, "W": W, "R": Rr, "I": I, "K": K, "A": A}
         for k in ser2:
             ser2[k] = 100.0 * np.array(ser2[k])
-        T_show = min(200, T_sim)  # keep plots readable
+        T_show = min(200, T_sim)
         plot_grid({kk: vv[:T_show + 1] for kk, vv in ser2.items()}, T_show,
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
