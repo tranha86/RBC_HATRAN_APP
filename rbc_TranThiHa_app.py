@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import base64
 from pathlib import Path
 import streamlit as st
-from textwrap import dedent 
+
 st.set_page_config(page_title="Real Business Cycle Model Simulation", layout="wide")
 
 # ---------- Header with (optional) logos ----------
@@ -16,56 +16,49 @@ def _img_to_data_url(p: Path) -> str:
     b64 = base64.b64encode(p.read_bytes()).decode("utf-8")
     return f"data:{mime};base64,{b64}"
 
-def add_header(left_logo: str,
-               title: str,
-               subtitle_top: str,
-               subtitle_bottom: str = "",
-               right_logo: str = ""):
-    def img_tag(path):
-        p = Path(path) if path else None
-        if p and p.exists():
-            mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-            b64 = base64.b64encode(p.read_bytes()).decode("utf-8")
-            return f'<img src="data:{mime};base64,{b64}" alt="Logo">'
-        return ""
+# Header KHÔNG dùng HTML thô (an toàn tuyệt đối)
+def add_header_simple(logo_path: str, title: str, subtitle: str):
+    cont = st.container()
+    with cont:
+        c1, c2, c3 = st.columns([1, 3, 1], gap="large")
+        with c1:
+            if Path(logo_path).exists():
+                st.image(logo_path, width=90)
+        with c2:
+            st.markdown(
+                f"<div style='text-align:center; font-weight:700; font-size:28px;"
+                f" margin-top:8px; color:white;'>{title}</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<div style='text-align:center; font-weight:600; font-size:18px;"
+                f" color:#ffd966;'>{subtitle}</div>",
+                unsafe_allow_html=True
+            )
+        # c3 để trống
 
-    left_html  = img_tag(left_logo)
-    right_html = img_tag(right_logo)
-    bottom_html = f'<div class="app-subtitle-bottom">{subtitle_bottom}</div>' if subtitle_bottom else ""
-
-    html = dedent(f"""
-    <style>
-    .app-header {{
-        display:flex;justify-content:space-between;align-items:center;
-        padding:15px 40px;background:linear-gradient(90deg,#2b5876,#4e4376);
-        border-bottom:3px solid #e0e0e0;box-shadow:0 4px 12px rgba(0,0,0,.15);
-        color:#fff;
-    }}
-    .app-header img {{height:90px}}
-    .app-center {{text-align:center;flex-grow:1;margin:0 30px}}
-    .app-title {{font-size:28px;font-weight:700;margin-bottom:8px}}
-    .app-subtitle-top {{font-size:20px;font-weight:600;color:#ffd966}}
-    .app-subtitle-bottom {{font-size:18px;font-weight:500;color:#ffecb3}}
-    </style>
-    <div class="app-header">
-        {left_html}
-        <div class="app-center">
-            <div class="app-title">{title}</div>
-            <div class="app-subtitle-top">{subtitle_top}</div>
-            {bottom_html}
-        </div>
-        {right_html}
-    </div>
-    """)
+    # Nền gradient + viền cho toàn container
+    st.markdown(
+        """
+        <style>
+        .stContainer > div:first-child {
+            background: linear-gradient(90deg,#2b5876,#4e4376);
+            border-bottom: 3px solid #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+            border-radius: 6px;
+            padding: 14px 12px 18px 12px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.markdown(html, unsafe_allow_html=True)
 # --- Call header (only NEU logo & name; no faculty line, no right logo) ---
-add_header(
-    left_logo="PNG1.png",
+add_header_simple(
+    logo_path="PNG1.png",
     title="Real Business Cycle Model Simulation (Full RBC)",
-    subtitle_top="National Economics University",
-    subtitle_bottom="",     # không hiện dòng khoa
-    right_logo=""           # không có logo phải
+    subtitle="National Economics University"
 )
 
 # ---------- Sidebar: parameters ----------
@@ -363,6 +356,7 @@ with tabs[3]:
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
         st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+
 
 
 
