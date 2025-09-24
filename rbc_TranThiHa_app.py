@@ -230,49 +230,74 @@ with col2:
         st.stop()
 
 # ======================= Tabs =======================
-tabs = st.tabs(["Model Overview", "Steady-State Values", "Impulse Response Functions", "Stochastic Simulation"])
+# ---------- Model Overview (chi tiết, render LaTeX chuẩn) ----------
+with st.expander("Model Overview (Full RBC) / Tổng quan mô hình", expanded=True):
+    # ===== Households =====
+    st.markdown("## Households / Hộ gia đình đại diện")
+    st.markdown(
+        "- The representative household maximizes lifetime utility / "
+        "Hộ gia đình đại diện tối đa hóa hữu dụng trọn đời:"
+    )
+    st.latex(r"\max_{\{c_t,k_{t+1},n_t\}} \; \mathbb{E}_0 \sum_{t=0}^{\infty} \beta^t \, u(c_t,n_t)")
+    st.latex(r"u(c_t,n_t)=\frac{c_t^{1-\eta}-1}{1-\eta} \;-\; \theta \frac{n_t^{1+\phi}}{1+\phi}")
+    st.markdown(
+        "- Parameters: $0<\beta<1$ (discount), $\eta>0$ (inv. IES), "
+        "$\phi>0$ (Frisch elasticity inverse), $\\theta>0$ (leisure weight)."
+    )
 
-with tabs[0]:
-    st.write("This tab summarizes the model blocks and linear solution.")
+    # ===== Budget & Capital =====
+    st.markdown("### Budget & Capital Accumulation / Ràng buộc ngân sách & tích lũy vốn")
+    st.latex(r"c_t + i_t \;=\; r_t\,k_t \;+\; w_t\,n_t")
+    st.latex(r"k_{t+1} \;=\; (1-\delta)\,k_t \;+\; i_t")
+    st.markdown(
+        "- $c_t$: consumption; $i_t$: investment; $k_t$: capital; $n_t$: labor; "
+        "$r_t$: rental rate of capital; $w_t$: wage; $0<\delta<1$: depreciation."
+    )
 
-with tabs[1]:
-    st.markdown("### Steady-State Values")
-    df = pd.DataFrame({
-        "Variable": ["Interest Rate (r)", "Wage (w)", "Output (y)", "Investment (i)",
-                     "Consumption (c)", "Labor (n)", "Capital (k)"],
-        "Value": [r_ss, w_ss, y_ss, i_ss, c_ss, n_ss, k_ss]
-    })
-    df["Value"] = df["Value"].map(float)
-    st.table(df)
+    # ===== Production =====
+    st.markdown("## Production / Sản xuất")
+    st.latex(r"y_t \;=\; A_t\,k_t^{\alpha}\,n_t^{\,1-\alpha}, \qquad 0<\alpha<1")
+    st.markdown(
+        "- Competitive firm with Cobb–Douglas technology / Công ty cạnh tranh với công nghệ Cobb–Douglas."
+    )
 
-with tabs[2]:
-    st.markdown("### Impulse Response Functions")
-    ser = irf(P, Q, R, S, rho_a, impulse, T_irf, percent=True)
-    plot_grid(ser, T_irf, "IRFs to a one-time TFP shock ε at t=0 (log-deviation, %)")
+    # ===== Stochastic process =====
+    st.markdown("## Stochastic Process for TFP / Quá trình ngẫu nhiên của TFP")
+    st.latex(r"\log A_t \;=\; (1-\rho_A)\log A^{ss} \;+\; \rho_A \log A_{t-1} \;+\; \varepsilon_t")
+    st.latex(r"\varepsilon_t \sim \mathcal{N}(0,\sigma_{\varepsilon}^{2}), \qquad 0\le \rho_A<1")
+    st.markdown("- $A^{ss}$ is steady-state TFP / $A^{ss}$ là mức TFP trạng thái dừng.")
 
-with tabs[3]:
-    st.markdown("### Stochastic Simulation (AR(1) TFP shocks)")
-    if stoch_on:
-        if seed_on:
-            np.random.seed(int(seed))
-        eps = np.random.normal(0.0, sigma_e, size=T_sim)
-        A = np.zeros(T_sim + 1); K = np.zeros(T_sim + 1)
-        Y = np.zeros(T_sim + 1); Cc = np.zeros(T_sim + 1); L = np.zeros(T_sim + 1)
-        W = np.zeros(T_sim + 1); Rr = np.zeros(T_sim + 1); I = np.zeros(T_sim + 1)
-        for t in range(T_sim):
-            Y[t]  = R[0, 0]*K[t] + S[0, 0]*A[t]
-            Cc[t] = R[1, 0]*K[t] + S[1, 0]*A[t]
-            L[t]  = R[2, 0]*K[t] + S[2, 0]*A[t]
-            W[t]  = R[3, 0]*K[t] + S[3, 0]*A[t]
-            Rr[t] = R[4, 0]*K[t] + S[4, 0]*A[t]
-            I[t]  = R[5, 0]*K[t] + S[5, 0]*A[t]
-            K[t + 1] = P*K[t] + Q*A[t]
-            A[t + 1] = rho_a*A[t] + eps[t]
-        ser2 = {"Y": Y, "C": Cc, "L": L, "W": W, "R": Rr, "I": I, "K": K, "A": A}
-        for k in ser2:
-            ser2[k] = 100.0 * np.array(ser2[k])
-        T_show = min(200, T_sim)
-        plot_grid({kk: vv[:T_show + 1] for kk, vv in ser2.items()}, T_show,
-                  "Sample path (first 200 periods shown), units: % log-deviation")
-    else:
-        st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+    # ===== Equilibrium conditions =====
+    st.markdown("## Market-Clearing / Cân bằng thị trường")
+    st.latex(r"y_t \;=\; c_t \;+\; i_t")
+
+    # ===== First-order conditions (nonlinear) =====
+    st.markdown("## Non-linear First-Order Conditions / Điều kiện bậc nhất (phi tuyến)")
+    st.latex(r"\theta\, c_t^{\eta}\, n_t^{\phi} \;=\; w_t \quad \text{(intratemporal labor-leisure)}")
+    st.latex(r"c_t^{-\eta} \;=\; \beta\,\mathbb{E}_t\!\Big[c_{t+1}^{-\eta}\,\big(1+r_{t+1}-\delta\big)\Big] \quad \text{(Euler)}")
+    st.latex(r"k_{t+1} \;=\; (1-\delta)k_t \;+\; i_t")
+    st.latex(r"y_t \;=\; A_t k_t^{\alpha} n_t^{\,1-\alpha}")
+    st.latex(r"r_t \;=\; A_t \alpha k_t^{\alpha-1} n_t^{\,1-\alpha}, \qquad w_t \;=\; A_t(1-\alpha)k_t^{\alpha} n_t^{-\alpha}")
+
+    # ===== Log-linearization =====
+    st.markdown("## Log-linearization (Uhlig / Christiano) / Tuyến tính hóa log")
+    st.markdown(
+        "Let tildes denote log-deviations from steady state: "
+        "$\\tilde x_t = \\log x_t - \\log x^{ss}$. Then the linearized system:"
+    )
+    st.latex(r"\eta\,\tilde c_t \;+\; \phi\,\tilde n_t \;=\; \tilde w_t")
+    st.latex(r"\mathbb{E}_t(\tilde c_{t+1}) - \tilde c_t \;=\; \beta r^{ss}\eta\,\mathbb{E}_t(\tilde r_{t+1})")
+    st.latex(r"\tilde k_{t+1} \;=\; (1-\delta)\tilde k_t \;+\; \delta\,\tilde i_t")
+    st.latex(r"\tilde y_t \;=\; \tilde A_t \;+\; \alpha\,\tilde k_t \;+\; (1-\alpha)\,\tilde n_t")
+    st.latex(r"\tilde r_t \;=\; \tilde y_t - \tilde k_t, \qquad \tilde w_t \;=\; \tilde y_t - \tilde n_t")
+    st.latex(r"y^{ss}\,\tilde y_t \;=\; c^{ss}\,\tilde c_t \;+\; i^{ss}\,\tilde i_t, \qquad \tilde A_t \;=\; \rho_A \tilde A_{t-1} + \varepsilon_t")
+
+    # ===== Solution method =====
+    st.markdown("## Solution Method / Phương pháp nghiệm")
+    st.markdown(
+        "- We use the **Method of Undetermined Coefficients** (Christiano, 2002; Uhlig, 1999) "
+        "to solve the linearized system for policy rules "
+        "$k_{t+1} = P\\,k_t + Q\\,A_t$, $x_t = R\\,k_t + S\\,A_t$ for "
+        "$x_t\\in\\{y_t,c_t,n_t,w_t,r_t,i_t\\}$. "
+        "These matrices $(P,Q,R,S)$ được tính trong phần mã bên dưới và dùng để tạo IRF & mô phỏng."
+    )
