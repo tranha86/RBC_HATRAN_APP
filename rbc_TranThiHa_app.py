@@ -22,11 +22,19 @@ def add_header(left_logo: str,
                subtitle_bottom: str = "",
                right_logo: str = ""):
     """
-    Header: left logo + centered titles; right logo is optional.
-    subtitle_bottom left empty to hide 'Faculty/Department' line.
+    Header: left logo + centered titles.
+    Tự động bỏ các thẻ trống nếu không có subtitle_bottom hoặc right_logo.
     """
-    left_src  = _img_to_data_url(Path(left_logo)) if left_logo else ""
-    right_src = _img_to_data_url(Path(right_logo)) if right_logo else ""
+    def img_tag(path):
+        if path and Path(path).exists():
+            src = _img_to_data_url(Path(path))
+            return f'<img src="{src}" alt="Logo">'
+        return ""
+
+    left_html  = img_tag(left_logo)
+    right_html = img_tag(right_logo)
+
+    bottom_html = f'<div class="app-subtitle-bottom">{subtitle_bottom}</div>' if subtitle_bottom else ""
 
     st.markdown(
         f"""
@@ -46,13 +54,13 @@ def add_header(left_logo: str,
         .app-subtitle-bottom {{ font-size: 18px; font-weight: 500; color: #ffecb3; }}
         </style>
         <div class="app-header">
-            {f'<img src="{left_src}" alt="Left Logo">' if left_src else ''}
+            {left_html}
             <div class="app-center">
                 <div class="app-title">{title}</div>
                 <div class="app-subtitle-top">{subtitle_top}</div>
-                {f'<div class="app-subtitle-bottom">{subtitle_bottom}</div>' if subtitle_bottom else ''}
+                {bottom_html}
             </div>
-            {f'<img src="{right_src}" alt="Right Logo">' if right_src else ''}
+            {right_html}
         </div>
         """,
         unsafe_allow_html=True
@@ -362,4 +370,5 @@ with tabs[3]:
                   "Sample path (first 200 periods shown), units: % log-deviation")
     else:
         st.info("Tick **Enable Stochastic Simulation** in the sidebar to run.")
+
 
